@@ -1,11 +1,10 @@
 module LED_control(
     input clk,
-    input flash_clk,
+    input led_clk,
     input reset,
     input [3-1:0] state,
-    input btn_down,
-    output reg [8-1:0] LED,
-    output reg [3-1:0] selected_group
+    input [8-1:0] selected_group,
+    output reg [8-1:0] LED
 );
 
     parameter RESET = 3'd0;
@@ -14,44 +13,79 @@ module LED_control(
     parameter GET = 3'd3;
     parameter OVER = 3'd4;
 
-    reg [3-1:0] flash_cnt;
-    wire [3-1:0] next_flash_cnt;
+    reg [3-1:0] led_cnt, next_led_cnt;
+    reg direction, next_direction;
 
-    //flash_cnt
+    //led_cnt
     always @(posedge clk) begin
-        if(reset == 1'b1)
-            flash_cnt <= 3'd0;
+        if(reset == 1'b1) begin
+            led_cnt <= 3'd0;
+            direction <= 1'b0;
+        end
         else begin
-            if(flash_clk == 1'b1)
-                flash_cnt <= next_flash_cnt;
-            else
-                flash_cnt <= flash_cnt;
+            if(led_clk == 1'b1) begin
+                led_cnt <= next_led_cnt;
+                direction <= next_direction;
+            end
+            else begin
+                led_cnt <= led_cnt;
+                direction <= next_direction;
+            end
         end
     end
 
-    assign next_flash_cnt = flash_cnt + 3'd1;
-
-    //selected_group
     always @(*) begin
-        case(state)
-            RESET: selected_group = 3'd0;
-            WAIT: selected_group = 3'd0;
-            START: selected_group = (btn_down == 1'b1)? flash_cnt : 3'd0;
-            GET: selected_group = selected_group;
-            OVER: selected_group = 3'd0;
-            default: selected_group = 3'd0;
-        endcase
+        //up
+        if(direction == 1'b0) begin
+            if(led_cnt == 3'd7)
+                next_direction = 1'b1;
+            else
+                next_direction = direction;
+        end
+        //down
+        else begin
+            if(led_cnt == 3'b0)
+                next_direction = 1'b0;
+            else
+                next_direction = direction;
+        end
     end
 
-    //LED
+    always @(*) begin
+        if(direction == 1'b0) begin
+            if(led_cnt == 3'd7)
+                next_led_cnt = 3'd6;
+            else
+                next_led_cnt = led_cnt + 3'b1;
+        end
+        else begin
+            if(led_cnt == 3'b0)
+                next_led_cnt = 3'b1;
+            else
+                next_led_cnt = led_cnt - 3'b1;
+        end
+    end
+
+
     always @(*) begin
         case(state)
-            RESET:
-                LED = 8'b0000_0000; 
+            RESET: begin
+                case(led_cnt)
+                    3'd0: LED = 8'b1000_0000;   
+                    3'd1: LED = 8'b0100_0000;   
+                    3'd2: LED = 8'b0010_0000;   
+                    3'd3: LED = 8'b0001_0000;   
+                    3'd4: LED = 8'b0000_1000;   
+                    3'd5: LED = 8'b0000_0100;   
+                    3'd6: LED = 8'b0000_0010;   
+                    3'd7: LED = 8'b0000_0001;   
+                    default: LED = 8'b0;
+                endcase
+            end
             WAIT:
                 LED = 8'b1111_1111;
             START: begin
-                case(flash_cnt)
+                case(selected_group)
                     3'd0: LED = 8'b0101_0101;   //1/3/5/7
                     3'd1: LED = 8'b0100_1001;   //1/4/7
                     3'd2: LED = 8'b0001_0010;   //3/6

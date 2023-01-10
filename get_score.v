@@ -1,8 +1,8 @@
 module get_score(  // 算可以加幾分
     input clk,
     input [2:0] state,
-    input [8-1:0] getball,  // 球進哪個洞
     input [3-1:0] selected_group, // 現在是哪一個得分組合
+    output [8-1:0] getball,  // 球進哪個洞
     output reg [15-1:0] score //
 );
 

@@ -4,7 +4,8 @@ module Top(
     input clk,
     input [8-1:0] ball,
     input start_btn, round_btn, rst_btn,
-    output reg [8-1:0] LED,
+    output [3-1:0] state,
+    output wire [8-1:0] LED,
     output reg [3:0] AN,
     output reg [6:0] seg
 );
@@ -25,12 +26,16 @@ parameter GET = 3'd3;
 parameter OVER = 3'd4;
 
 reg [2:0] state, next_state;
-reg [15-1:0] score, next_score; // 現在總得分
-reg [4-1:0] ball_num; // 剩幾顆球
-reg [8-1:0] getball; //記球進哪個洞
-reg [3-1:0] selected_group;  // 可以得分的洞口組合
+wire [15-1:0] score; // 現在總得分
+wire [4-1:0] ball_num; // 剩幾顆球
+wire [8-1:0] getball; //記球進哪個洞
+wire [3-1:0] selected_group;  // 可以得分的洞口組合
 reg [30-1:0] secCounter, next_secCounter; // 秒數計時器(最多記到5秒)
+wire flash_clk; // select
+wire led_clk;
 
+ClockDivider23 clk23(clk, rst_op, flash_clk);
+ClockDivider24 clk24(clk, rst_op, led_clk);
 
 ball_sensor BS(  // 更新球數、判斷是否有得分、球進哪個洞
     .clk(clk),
@@ -40,11 +45,22 @@ ball_sensor BS(  // 更新球數、判斷是否有得分、球進哪個洞
     .getball(getball) //
 );
 
-generate_LED led(
+LED_control led(
     .clk(clk),
+    .led_clk(led_clk),
+    .reset(rst_op),
     .state(state),
-    .LED(LED),  //
-    .selected_group(selected_group) //
+    .selected_group(selected_group), //
+    .LED(LED)  //
+);
+
+Group_select GSL(
+    .clk(clk),
+    .flash_clk(flash_clk),
+    .reset(rst_op),
+    .state(state),
+    .btn_down(Rbtn_op),
+    .selected_group(selected_group)  //
 );
 
 get_score GS(
@@ -67,7 +83,7 @@ end
 always @(posedge clk) begin
     if(rst_op == 1'b1) begin
         state <= RESET;
-        secCounter <= 0;
+        secCounter <= 30'b0;
     end
     else begin
         state <= next_state;
@@ -91,7 +107,7 @@ always @(*) begin
         end
         GET: begin
             if(secCounter >= 30'd2000000 && ball_num > 3'd0) next_state = WAIT;
-            else if(ball_num == 3'd0) next_state = OVER;
+            else if(secCounter >= 30'd2000000 && ball_num == 3'd0) next_state = OVER;
             else next_state = GET;
         end
         OVER: begin
@@ -107,6 +123,56 @@ end
 endmodule
 
 
+// ClockDivider25 - flash
+module ClockDivider23 (clk, rst_n, newclk);
+    input clk, rst_n;
+    output reg newclk;
+
+    reg [23-1:0] ctr_co;
+    always @(posedge clk) begin
+        if(rst_n) begin
+            ctr_co <= 23'b0;
+        end
+        else begin
+            ctr_co <= ctr_co + 23'b1;
+        end 
+    end
+
+    always @(posedge clk) begin
+        if(rst_n) begin
+            newclk <= 23'b0;
+        end
+        else begin
+            newclk <= ctr_co == 23'b11111111111111111111111;
+        end
+    end
+endmodule
+
+// ClockDivider24 - led
+module ClockDivider24 (clk, rst_n, newclk);
+    input clk, rst_n;
+    output reg newclk;
+
+    reg [24-1:0] ctr_co;
+    always @(posedge clk) begin
+        if(rst_n) begin
+            ctr_co <= 24'b0;
+        end
+        else begin
+            ctr_co <= ctr_co + 24'b1;
+        end 
+    end
+
+   always @(posedge clk) begin
+        if(rst_n) begin
+            newclk <=1'b0;
+        end
+        else begin
+            newclk <= ctr_co == 24'b111111111111111111111111;
+        end
+    end
+
+endmodule
 
 module debounce (pb_debounced, pb, clk);
     output pb_debounced; 
