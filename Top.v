@@ -40,6 +40,7 @@ wire [3-1:0] selected_group;  // 可以得分的洞口組合
 reg [30-1:0] secCounter, next_secCounter; // 秒數計時器(最多記到5秒)
 wire flash_clk, led_clk, display_clk; 
 wire win; // 判斷是不是贏了
+wire match; // 進對的洞
 
 assign show_ball = ball;
 
@@ -51,6 +52,7 @@ audio OD(
     .clk(clk), 
     .reset(rst_op), 
     .state(state), 
+    .match(match),
     .AIN(AIN),          //
     .GAIN(GAIN),        //
     .SHUTDOWN(SHUTDOWN) //
@@ -92,7 +94,8 @@ get_score GS(
     .getball(getball),
     .selected_group(selected_group), 
     .score(score), //
-    .win(win) //
+    .win(win), //
+    .match(match)
 );
 
 // show score on 7segment

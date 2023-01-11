@@ -1,17 +1,17 @@
-module audio(clk, reset, state, AIN, GAIN, SHUTDOWN);
+module audio(clk, reset, state, match, AIN, GAIN, SHUTDOWN);
     input clk;
     input reset;
     input [3-1:0] state;
+    input match;
     output AIN, GAIN, SHUTDOWN;
 
     reg [32-1:0] notes_speed;   //一秒幾note
-    parameter duty = 10'd512;
+    parameter DUTY = 10'd512;
     wire beatclk;
     wire [32-1:0] beat_count;
     wire [32-1:0] note_freq;
 
-    reg [3-1:0] prev_state;
-    wire change_state;
+    reg whether_get_score, next_whether_get_score;
 
     assign GAIN = 1'd1;
     assign SHUTDOWN = 1'd1;
@@ -22,43 +22,56 @@ module audio(clk, reset, state, AIN, GAIN, SHUTDOWN);
     parameter GET = 3'd3;
     parameter OVER = 3'd4;
 
-    PWM_gen Beat_speed_gen(.clk(clk), .reset(reset), .freq(notes_speed), .duty(duty), .PWM(beatclk));
+    PWM_gen Beat_speed_gen(.clk(clk), .reset(reset), .freq(notes_speed), .duty(DUTY), .PWM(beatclk));
 
-    beat_counter bc(.clk(clk), .beatclk(beatclk), .reset(reset), .beat_count(beat_count));
+    beat_counter bc(.clk(beatclk), .reset(reset), .state(state), .beat_count(beat_count));
 
-    music_control mc(.clk(clk), .reset(reset), .state(state), .beat_count(beat_count), .tone(note_freq));
+    music_control mc(.clk(clk), .reset(reset), .state(state), .whether_get_score(whether_get_score), .beat_count(beat_count), .tone(note_freq));
 
-    PWM_gen Tone_audio_gen(.clk(clk), .reset(reset), .freq(note_freq), .duty(duty), .PWM(AIN));
-
-    //change state
-    always @(posedge clk) begin
-        if(reset == 1'b1)
-            prev_state <= WAIT;
-        else
-            prev_state <= state;
-    end
-
-    assign change_state = !(prev_state == change_state);
+    PWM_gen Tone_audio_gen(.clk(clk), .reset(reset), .freq(note_freq), .duty(DUTY), .PWM(AIN));
 
     //notes_speed
     always @(*) begin
         case(state)
-            WAIT: notes_speed = 32'd4;
+            WAIT: notes_speed = 32'd8;
+            GET: notes_speed = 32'd16;
             default: notes_speed = 32'd1;
         endcase
     end    
+
+    always @(posedge clk) begin
+        whether_get_score <= next_whether_get_score;
+    end
+
+    always @(*) begin
+        case(state) 
+            START, GET: begin
+                if(match == 1'b1)
+                    next_whether_get_score = 1'b1;
+                else 
+                    next_whether_get_score = whether_get_score;
+            end
+            default:
+                next_whether_get_score = 1'b0;
+        endcase
+
+    end
 
 endmodule
 
 module beat_counter(
     input clk,
-    input beatclk,
     input reset,
-    input change_state,
+    input [3-1:0] state,
     output reg [32-1:0] beat_count
 );
 
-    //parameter Max_beatnum = 32'd500;
+    parameter RESET = 3'd0;
+    parameter WAIT = 3'd1;
+    parameter START = 3'd2;
+    parameter GET = 3'd3;
+    parameter OVER = 3'd4;
+
     reg [32-1:0] next_beat_count;
 
     always @(posedge clk) begin
@@ -70,18 +83,10 @@ module beat_counter(
     end
 
     always @(*) begin
-        if(change_state == 1'b1)
-            next_beat_count = 32'b0;
-        else begin
-            if(beatclk == 1'b1) begin
-                if(change_state == 1'b1)
-                    next_beat_count = 32'b0;
-                else
-                    next_beat_count = beat_count + 32'b1;
-            end
-            else
-                next_beat_count = beat_count;
-        end
+        case(state)
+            WAIT, GET: next_beat_count = beat_count + 32'b1;
+            default: next_beat_count = 32'b0;
+        endcase
     end
 
 endmodule
@@ -90,6 +95,7 @@ module music_control(
     input clk,
     input reset,
     input [3-1:0] state,
+    input whether_get_score,
     input [32-1:0] beat_count,
     output reg [32-1:0] tone
 );
@@ -136,13 +142,22 @@ module music_control(
     parameter [5-1:0] C8 = 5'd29;
 
     reg [5-1:0] note_name;
-    wire [5-1:0] wait_note;
+    wire [5-1:0] wait_note, get_score_note, no_score_note;
 
-    Music_WAIT mw(.beat_cnt(beat_cnt), .note(wait_note));
+    Music_WAIT mw(.beat_cnt(beat_count), .note(wait_note));
+    Music_GET_SCORE mg(.beat_cnt(beat_count), .note(get_score_note));
+    Music_NO_SCORE mn(.beat_cnt(beat_count), .note(no_score_note));
 
     always @(*) begin
         case(state)
             WAIT: note_name = wait_note;
+            GET: begin
+                if(whether_get_score == 1'b1)
+                    note_name = get_score_note;
+                else
+                    note_name = no_score_note;
+            end
+            
             default: note_name = S;
         endcase
     end
