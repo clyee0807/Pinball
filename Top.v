@@ -3,7 +3,7 @@
 module Top(
     input clk,
     input [8-1:0] ball,
-    input start_btn, round_btn, rst_btn, // ç„¡æ³•reset
+    input start_btn, round_btn, rst_btn, // ?„¡æ³•reset
     // output reg [3-1:0] state,
     output [8-1:0] show_ball,
     output reg [0:8-1] scoreLED,
@@ -12,6 +12,7 @@ module Top(
     output reg [6:0] seg,
     output AIN,
     output GAIN,
+    
     output SHUTDOWN
 );
 
@@ -30,17 +31,17 @@ parameter START = 3'd2;
 parameter GET = 3'd3;
 parameter OVER = 3'd4;
 
-// wire has_pass; // æœ‰çƒé€šé
+// wire has_pass; // ??‰ç?ƒé?šé??
 reg [2:0] state, next_state;
-wire [15-1:0] score; // ç¾åœ¨ç¸½å¾—åˆ†
-reg [3:0] show_score; // é¡¯ç¤ºåœ¨7segmentä¸Šçš„åˆ†æ•¸
-wire [4-1:0] ball_num; // å‰©å¹¾é¡†çƒ
-wire [8-1:0] getball; //è¨˜çƒé€²å“ªå€‹æ´
-wire [3-1:0] selected_group;  // å¯ä»¥å¾—åˆ†çš„æ´å£çµ„åˆ
-reg [30-1:0] secCounter, next_secCounter; // ç§’æ•¸è¨ˆæ™‚å™¨(æœ€å¤šè¨˜åˆ°5ç§’)
+wire [15-1:0] score; // ?¾?œ¨ç¸½å?—å??
+reg [3:0] show_score; // é¡¯ç¤º?œ¨7segmentä¸Šç?„å?†æ•¸
+wire [4-1:0] ball_num; // ?‰©å¹¾é?†ç??
+wire [8-1:0] getball; //è¨˜ç?ƒé?²å“ª?‹æ??
+wire [3-1:0] selected_group;  // ?¯ä»¥å?—å?†ç?„æ?å£çµ„å??
+reg [30-1:0] secCounter, next_secCounter; // ç§’æ•¸è¨ˆæ?‚å™¨(??å¤šè?˜åˆ°5ç§?)
 wire flash_clk, led_clk, display_clk; 
-wire win; // åˆ¤æ–·æ˜¯ä¸æ˜¯è´äº†
-wire match; // é€²å°çš„æ´
+wire win; // ?ˆ¤?–·?˜¯ä¸æ˜¯è´ä??
+wire match; // ?²å?ç?„æ??
 
 assign show_ball = ball;
 
@@ -58,7 +59,7 @@ audio OD(
     .SHUTDOWN(SHUTDOWN) //
 );
 
-ball_sensor BS(  // æ›´æ–°çƒæ•¸ã€åˆ¤æ–·æ˜¯å¦æœ‰å¾—åˆ†ã€çƒé€²å“ªå€‹æ´
+ball_sensor BS(  // ?›´?–°??ƒæ•¸?åˆ¤?–·?˜¯?¦??‰å?—å?†ã?ç?ƒé?²å“ª?‹æ??
     .clk(clk),
     .ball(ball),
     .state(state),
@@ -247,7 +248,7 @@ always @(*) begin
             else next_state = WAIT;
         end
         START: begin
-            if(ball != 8'b0) next_state = GET; // æœ‰çƒæ»¾éå»äº†
+            if(ball != 8'b0) next_state = GET; // ??‰ç?ƒæ»¾??å»äº?
             else next_state = START;
         end
         GET: begin
