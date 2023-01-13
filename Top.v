@@ -3,8 +3,7 @@
 module Top(
     input clk,
     input [8-1:0] ball,
-    input start_btn, round_btn, rst_btn, // ?„¡æ³•reset
-    // output reg [3-1:0] state,
+    input start_btn, round_btn, rst_btn, 
     output [8-1:0] show_ball,
     output reg [0:8-1] scoreLED,
     output wire [8-1:0] LED,
@@ -31,17 +30,17 @@ parameter START = 3'd2;
 parameter GET = 3'd3;
 parameter OVER = 3'd4;
 
-// wire has_pass; // ??‰ç?ƒé?šé??
+
 reg [2:0] state, next_state;
-wire [15-1:0] score; // ?¾?œ¨ç¸½å?—å??
-reg [3:0] show_score; // é¡¯ç¤º?œ¨7segmentä¸Šç?„å?†æ•¸
-wire [4-1:0] ball_num; // ?‰©å¹¾é?†ç??
-wire [8-1:0] getball; //è¨˜ç?ƒé?²å“ª?‹æ??
-wire [3-1:0] selected_group;  // ?¯ä»¥å?—å?†ç?„æ?žå£çµ„å??
-reg [30-1:0] secCounter, next_secCounter; // ç§’æ•¸è¨ˆæ?‚å™¨(??å¤šè?˜åˆ°5ç§?)
+wire [15-1:0] score; // total score
+reg [3:0] show_score; // each digit of score show on 7segment
+wire [4-1:0] ball_num; // # of remaining balls
+wire [8-1:0] getball; // which hole the ball has passed
+wire [3-1:0] selected_group;  // the hole group the hole can get score 
+reg [30-1:0] secCounter, next_secCounter; // second counter
 wire flash_clk, led_clk, display_clk; 
-wire win; // ?ˆ¤?–·?˜¯ä¸æ˜¯è´ä??
-wire match; // ?²å?ç?„æ??
+wire win; // win or lose
+wire match; // pass the correct hole or not
 
 assign show_ball = ball;
 
@@ -59,15 +58,16 @@ audio OD(
     .SHUTDOWN(SHUTDOWN) //
 );
 
-ball_sensor BS(  // ?›´?–°??ƒæ•¸?åˆ¤?–·?˜¯?¦??‰å?—å?†ã?ç?ƒé?²å“ª?‹æ??
+// æ›´æ–°çƒæ•¸ã€çƒé€²å“ªå€‹æ´ž
+ball_sensor BS(  
     .clk(clk),
     .ball(ball),
     .state(state),
-    // .has_pass(has_pass), //
     .ball_num(ball_num), //
     .getball(getball) //
 );
 
+// æŽ§åˆ¶LEDçš„äº®æ³•(åŒ…æ‹¬äº‚æ•¸ã€å‹åˆ©å¤±æ•—ã€ä¸åŒstateçš„äº®æ³•)
 LED_control led(
     .clk(clk),
     .led_clk(led_clk),
@@ -78,7 +78,7 @@ LED_control led(
     .LED(LED)  //
 );
 
-
+// äº‚æ•¸æ±ºå®šå¾—åˆ†çµ„åˆ¥
 Group_select GSL(
     .clk(clk),
     .flash_clk(flash_clk),
@@ -88,6 +88,7 @@ Group_select GSL(
     .selected_group(selected_group)  
 );
 
+// æ›´æ–°åˆ†æ•¸
 get_score GS(
     .clk(clk),
     .state(state),
@@ -96,7 +97,7 @@ get_score GS(
     .selected_group(selected_group), 
     .score(score), //
     .win(win), //
-    .match(match)
+    .match(match) //
 );
 
 // show score on 7segment
@@ -112,7 +113,7 @@ end
 always @(*) begin
     case(display_cnt) 
         2'b00: begin
-            AN = 4'b1111;  // debug(origin: AN = 1111)
+            AN = 4'b1111;  
         end
         2'b01: begin
             if(score >= 15'd100) begin 
@@ -144,17 +145,6 @@ always @(*) begin
     case(display_cnt) 
         2'b00: begin
             show_score = 4'd12;
-            // case(getball)
-            //     8'b1000_0000: show_score = 4'd7;
-            //     8'b0100_0000: show_score = 4'd6;
-            //     8'b0010_0000: show_score = 4'd5;
-            //     8'b0001_0000: show_score = 4'd4;
-            //     8'b0000_1000: show_score = 4'd3;
-            //     8'b0000_0100: show_score = 4'd2;
-            //     8'b0000_0010: show_score = 4'd1;
-            //     8'b0000_0001: show_score = 4'd0;
-            //     default: show_score = 4'd8;
-            // endcase
         end
         2'b01: begin
             show_score = score / 15'd100;
@@ -190,7 +180,7 @@ always @(*) begin
 end
 
 
-// show the number of ball
+// show the number of ball on led of FPGA
 always @(*) begin
     case(ball_num)
         4'd8: scoreLED = 8'b11111111;
@@ -206,6 +196,7 @@ always @(*) begin
     endcase
 end
 
+// second counter
 always @(posedge clk) begin
     if(state == GET) begin
         secCounter <= next_secCounter; 
@@ -214,26 +205,22 @@ always @(posedge clk) begin
         secCounter <= 30'd0;
     end
 end
-
-// second counter
 always @(*) begin
     if(state == GET) begin
         next_secCounter = secCounter + 30'b1;
     end
     else begin
-        next_secCounter = 30'b0;
+        next_secCounter = 30'd0;
     end
 end
 
 // state transfer
 always @(posedge clk) begin
-    if(rst_btn == 1'b1) begin  // op
+    if(rst_btn == 1'b1) begin   // op  
         state <= RESET;
-        // secCounter <= 30'b0;
     end
     else begin
         state <= next_state;
-        // secCounter <= next_secCounter;
     end
 end
 
@@ -248,7 +235,7 @@ always @(*) begin
             else next_state = WAIT;
         end
         START: begin
-            if(ball != 8'b0) next_state = GET; // ??‰ç?ƒæ»¾??ŽåŽ»äº?
+            if(ball != 8'b0) next_state = GET;
             else next_state = START;
         end
         GET: begin
@@ -272,7 +259,7 @@ end
 endmodule
 
 
-// ClockDivider25 - flash
+// ClockDivider23 - flash
 module ClockDivider23 (clk, rst_n, newclk);
     input clk, rst_n;
     output reg newclk;
